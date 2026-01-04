@@ -249,7 +249,7 @@ int battery_current_moving_avg_buffer[64] = {0};
 // 0x80  = PAS state invalid -> reset
 volatile uint8_t ui8_pas_new_transition = 0;
 
-inline uint32_t update_moving_average(uint32_t new_value){
+static uint32_t update_moving_average(uint32_t new_value){
     battery_current_moving_avg_sum -= battery_current_moving_avg_buffer[battery_current_moving_avg_index];
     battery_current_moving_avg_buffer[battery_current_moving_avg_index] = new_value;
     battery_current_moving_avg_sum += new_value;
@@ -259,7 +259,7 @@ inline uint32_t update_moving_average(uint32_t new_value){
 }
 
 
-inline uint32_t filtering_function(uint32_t ui32_temp_15b , uint32_t ui32_filtered_15b , uint32_t alpha){
+static uint32_t filtering_function(uint32_t ui32_temp_15b , uint32_t ui32_filtered_15b , uint32_t alpha){
     uint32_t ui32_temp_new = ui32_temp_15b * (16U - alpha);
     uint32_t ui32_temp_old =  ui32_filtered_15b * alpha;
     uint32_t ui32_filtered_value = ((ui32_temp_new + ui32_temp_old + (8)) >> 4);                    

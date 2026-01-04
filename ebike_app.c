@@ -2475,6 +2475,13 @@ static void communications_process_packages(uint8_t ui8_frame_type)
 		// battery max power target
 		ui8_target_battery_max_power_div25 = ui8_rx_buffer[6];
 		
+		// Apply hard safety limits to prevent dangerous power levels from display
+		#define MAX_SAFE_POWER_DIV25    48  // 1200W max hardware limit (48 * 25W)
+		
+		if (ui8_target_battery_max_power_div25 > MAX_SAFE_POWER_DIV25) {
+			ui8_target_battery_max_power_div25 = MAX_SAFE_POWER_DIV25;
+		}
+		
 		// calculate max battery current in ADC steps
 		// from the received battery current limit & power limit
 		if (ui8_target_battery_max_power_div25 != ui8_target_battery_max_power_div25_temp) {
