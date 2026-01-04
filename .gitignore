@@ -35,6 +35,9 @@ openocd.tcl
 #!.vscode/launch.json
 #!.vscode/extensions.json
 
+# JetBrains IDEs (CLion, IntelliJ IDEA)
+.idea/
+
 # IAR Embedded Workbench files
 
 # IAR Project file.
