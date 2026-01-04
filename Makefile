@@ -42,7 +42,9 @@ TARGET=tsdz8_for_GPIO_TEST
 #
 # If APPNAME is edited, ensure to update or regenerate launch
 # configurations for your IDE.
-APPNAME=mtb-example-xmc-gpio-toggle
+# Generate timestamp for firmware name
+TIMESTAMP := $(shell date +%Y%m%d_%H%M)
+APPNAME=tsdz8-fw-$(TIMESTAMP)
 
 # Name of toolchain to use. Options include:
 #
