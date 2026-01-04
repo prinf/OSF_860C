@@ -422,7 +422,7 @@ uint8_t ticks_intervals_status; // 0 =  new data can be written; 1 data being wr
 
 
 
-inline __attribute__((always_inline)) uint32_t update_moving_average(uint32_t new_value){
+static __attribute__((always_inline)) uint32_t update_moving_average(uint32_t new_value){
     battery_current_moving_avg_sum -= battery_current_moving_avg_buffer[battery_current_moving_avg_index];
     battery_current_moving_avg_buffer[battery_current_moving_avg_index] = new_value;
     battery_current_moving_avg_sum += new_value;
