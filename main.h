@@ -12,7 +12,7 @@
 //#include "config.h"
 #include "common.h"
                                     // !!!!!!!!!!!!!!
-#define FIRMWARE_VERSION "0.1.33"      //  !!! this version was derived from 0.1.13 for vlcd5 !!!!!!!!!!
+#define FIRMWARE_VERSION "0.1.36"      //  !!! this version was derived from 0.1.13 for vlcd5 !!!!!!!!!!
 //#define MAIN_CONFIGURATOR_VERSION 2   // for configurator (must be the same as in xls sheet)
 //#define SUB_CONFIGURATOR_VERSION 1    // is not used (just for reference)
 
@@ -52,6 +52,7 @@
 
 #define USE_IRQ_FOR_HALL (0) // 1 = use irq; 0 = use capture
 
+// note when USE_SPIDER_LOGIC_FOR_TORQUE > 0, KATANA logic is not used; to use KATANA, USE_SPIDER must be 0
 #define USE_SPIDER_LOGIC_FOR_TORQUE (3) // (1) = use Spider logic with a buffer of 20 value over one rotation.
                                         // (2) = mstrens variant using "expected" concept + smoothing
                                         // (3) = Spider logic, no reset of buffer when torque = 0, avg when less than 20.
@@ -65,6 +66,12 @@
 // those rules apply only when rotor rotation speed is fast enough otherwise we use "normal positioning"
 // Normal positionning means that extrapolation is based on each pattern change and on speed on last 360°
 
+#define TYPE_OF_FILTER_FOR_CURRENT (0) // 0 = moving average over 64 values max (this is normally used)
+                                // 1 = moving average over a full rotation
+
+#define DYNAMIC_LEAD_ANGLE      (0)   // (0) no dynamic
+                                      // (1) dynamic based on Id and a PID + optimiser
+                                      // (2) dynamic based on Idc and a optimiser (= esc)
 
 // *************** from here we have more general parameters 
 
@@ -87,7 +94,7 @@
 // wheel speed parameters
 #define OEM_WHEEL_SPEED_DIVISOR			384 // at 19 KHz
 
-#define PWM_CYCLES_SECOND			(64000000/(PWM_COUNTER_MAX*2)) // 55.5us (PWM period) 18 Khz // for TSDZ2, it was 16000000
+#define PWM_CYCLES_SECOND			(64000000/(PWM_COUNTER_MAX*2)) // 19000 = 55.5us (PWM period) 18 Khz // for TSDZ2, it was 16000000
 
 /*---------------------------------------------------------
  NOTE: regarding duty cycle (PWM) ramping
@@ -209,8 +216,8 @@ HALL_COUNTER_OFFSET_UP:    29 -> 44
 #define ADC_TORQUE_SENSOR_RANGE_TARGET	  		160 // from 860c
 //#define ADC_TORQUE_SENSOR_RANGE_TARGET_MIN 		133 // from 860c
 
-#define ADC_TORQUE_SENSOR_ANGLE_COEFF			11
-#define ADC_TORQUE_SENSOR_ANGLE_COEFF_X10		(uint16_t)(ADC_TORQUE_SENSOR_ANGLE_COEFF * 10)
+//#define ADC_TORQUE_SENSOR_ANGLE_COEFF			11
+//#define ADC_TORQUE_SENSOR_ANGLE_COEFF_X10		(uint16_t)(ADC_TORQUE_SENSOR_ANGLE_COEFF * 10)
 
 
 
@@ -298,7 +305,7 @@ HALL_COUNTER_OFFSET_UP:    29 -> 44
  ---------------------------------------------------------*/
 
 // cadence sensor
-#define CADENCE_SENSOR_NUMBER_MAGNETS			20U  // is not used in the code (hardcoded 60 min / 20 = 3)
+//#define CADENCE_SENSOR_NUMBER_MAGNETS			20U  // is not used in the code (hardcoded 60 min / 20 = 3)
 
 /*---------------------------------------------------------------------------
  NOTE: regarding the cadence sensor
@@ -314,7 +321,7 @@ HALL_COUNTER_OFFSET_UP:    29 -> 44
 
 
 // default values
-#define DEFAULT_VALUE_BATTERY_CURRENT_MAX                         10  // 10 amps
+#define DEFAULT_VALUE_BATTERY_CURRENT_MAX  10  // 10 amps Used only in 860C version
 
 /*---------------------------------------------------------
 
@@ -409,7 +416,7 @@ HALL_COUNTER_OFFSET_UP:    29 -> 44
 #define ASSIST_PEDAL_LEVEL3				0x04
 #define ASSIST_PEDAL_LEVEL4				0x08
 
-#define ASSIST_PEDAL_LEVEL01_PERCENT			60
+//#define ASSIST_PEDAL_LEVEL01_PERCENT			60 // is not used in the code
 
 // assist mode
 #define OFFROAD_MODE				0
