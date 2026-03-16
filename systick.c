@@ -101,12 +101,23 @@ void SysTick_Handler(void) {
 //    return a;
 //}
     ui32_ms_counter++;  // used to detect timeout
-    // --------- 1) cadence --------- 
-    // Cherche l’index (0..4) ayant le timestamp le plus grand
+    // --------- 1) cadence ---------
+    // Cherche l'index (0..4) ayant le timestamp le plus grand
     uint8_t ui8_cadence_idx_max = 0;
-    uint32_t ui32_cadence_tick_max = ui32_cadence_last_ticks[0];
+    uint32_t ui32_cadence_tick_snapshot[5];
+
+    // Atomically capture all cadence values
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    for (uint8_t i = 0; i < 5; ++i) {
+        ui32_cadence_tick_snapshot[i] = ui32_cadence_last_ticks[i];
+    }
+    __set_PRIMASK(primask);
+
+    // Process snapshot (no longer needs protection)
+    uint32_t ui32_cadence_tick_max = ui32_cadence_tick_snapshot[0];
     for (uint8_t i = 1; i <= 4; ++i) {
-        uint32_t t = ui32_cadence_last_ticks[i];
+        uint32_t t = ui32_cadence_tick_snapshot[i];
         if(t > ui32_cadence_tick_max) { ui32_cadence_tick_max = t; ui8_cadence_idx_max = i; }
     }
 
@@ -125,7 +136,7 @@ void SysTick_Handler(void) {
                 ui32_prev_cadence_tick = ui32_cadence_tick_max;
                 ui8_pas_counter = 0; // mstrens :  reset the counter for full rotation used to detect a full rotation for torque (spider)
             } else { // On a déjà une référence
-                uint32_t ui32_curr_cadence_tick = ui32_cadence_last_ticks[i8_prev_cadence_index]; 
+                uint32_t ui32_curr_cadence_tick = ui32_cadence_tick_snapshot[i8_prev_cadence_index]; 
                 // if tick for same index is different, then calculate elapsed ticks
                 if (ui32_curr_cadence_tick != ui32_prev_cadence_tick) {
                     uint32_t ui32_cadence_delta_ticks = ui32_curr_cadence_tick  - ui32_prev_cadence_tick;
@@ -154,8 +165,8 @@ void SysTick_Handler(void) {
         ui8_pas_counter = 0; // mstrens :  reset the counter for full rotation
     }
      
-    // --------- 2) Wheel --------- 
-    uint32_t ui32_wheel_pwm_tick = ui32_wheel_last_pwm_ticks; // ui32_wheel_last_pwm_ticks = pwm ticks of last rising edge
+    // --------- 2) Wheel ---------
+    uint32_t ui32_wheel_pwm_tick = ui32_wheel_last_pwm_ticks; // single aligned 32-bit read is atomic on Cortex-M4
     if (ui32_wheel_pwm_tick != ui32_prev_wheel_pwm_tick) {
         uint32_t ui32_wheel_delta_ticks;
         if (ui32_prev_wheel_pwm_tick == 0) {
@@ -402,9 +413,11 @@ void update_lead_angle(void)
     int32_t Id_filt = 0;
     int32_t Iq_filt = 0;
     
-    // Here we calculate Id and Iq filtered (based on process in ISR0 or ISR 1) that are used for optimisation of lead angle based on Id    
-    if ( ui8_id_iq_counter == 0 ){    
-        Id_filt = i32_id_sum >> 6; 
+    // Here we calculate Id and Iq filtered (based on process in ISR0 or ISR 1) that are used for optimisation of lead angle based on Id
+    if ( ui8_id_iq_counter == 0 ){
+        uint32_t primask = __get_PRIMASK();
+        __disable_irq();
+        Id_filt = i32_id_sum >> 6;
         Iq_filt = i32_iq_sum >> 6;
         // only for debug
         debug_id = Id_filt;
@@ -412,6 +425,7 @@ void update_lead_angle(void)
         i32_id_sum = 0;
         i32_iq_sum = 0;
         ui8_id_iq_counter = ID_IQ_COUNTER; // 64 Reset counter
+        __set_PRIMASK(primask);
     }
 
     // ----------------------

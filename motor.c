@@ -262,10 +262,10 @@ volatile uint16_t ADC_Bias_Iu = 1 << 11; // ADC is 12 bits, 0 = mid point
 volatile uint16_t ADC_Bias_Iv = 1 << 11; // ADC is 12 bits, 0 = mid point 
 volatile uint16_t ADC_Bias_Iw = 1 << 11; // ADC is 12 bits, 0 = mid point 
 
-// used in systick to optimise lead angle based on average Id, Iq 
-int32_t i32_id_sum = 0;     // accumulate Id to use an average in systick based on 64 values
-int32_t i32_iq_sum = 0;     // idem for Iq
-uint8_t ui8_id_iq_counter = ID_IQ_COUNTER; // 64 ; used to filter id & iq ; pwm at 19kHz and systick at 200Hz => 19000/200 = 95 measurements
+// used in systick to optimise lead angle based on average Id, Iq
+volatile int32_t i32_id_sum = 0;     // accumulate Id to use an average in systick based on 64 values
+volatile int32_t i32_iq_sum = 0;     // idem for Iq
+volatile uint8_t ui8_id_iq_counter = ID_IQ_COUNTER; // 64 ; used to filter id & iq ; pwm at 19kHz and systick at 200Hz => 19000/200 = 95 measurements
 
 // to debug or used with cordic
 int16_t I_u; // to check current in each phase
@@ -1385,7 +1385,9 @@ __RAM_FUNC __attribute__((always_inline)) inline void pll_on_hall_event(uint16_t
     #define XMC_MATH_UNSIGNED_DIVISION                    ((uint32_t) 1 << MATH_DIVCON_USIGN_Pos)
     MATH->DIVCON = XMC_MATH_UNSIGNED_DIVISION;
     MATH->DVD    = (uint32_t)FACTOR_INV_DT_US_Q0_16;
-    MATH->DVS    = (uint32_t)dt_us;
+    // Prevent division by zero - clamp to minimum safe value
+    uint32_t dt_us_safe = (dt_us == 0) ? 1 : dt_us;
+    MATH->DVS    = dt_us_safe;
     
     //pll.prev_hall_phase_q8_8 = pll.ui16_last_hall_phase_q8_8;
     pll.ui16_last_hall_phase_q8_8 = hall_phase_q8_8;
