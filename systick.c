@@ -285,7 +285,17 @@ void SysTick_Handler(void) {
 
 #define LEAD_ANGLE_Q8_8_PER_ADC_STEP (17) // = 750 / 45 = 17 : Test showed that for a speed of about 2500 RPM,
                  // lead angle should varies by about 3° = 750 q8_8 units for a delta of 45 ADC steps
-                 //                           45 = between 10 and 55 ADC current 10 bits 
+                 //                           45 = between 10 and 55 ADC current 10 bits
+
+// Field weakening via lead angle extension (controlled by display FW toggle)
+#define FW_DUTY_TARGET          250    // ~98% duty: FW aims to keep PWM at this level
+#define FW_LEAD_MAX_DEGREE      10     // max FW offset in degrees
+#define FW_LEAD_STEP_DEGREE     0.05   // ramp rate per 200Hz tick
+#define LEAD_TOTAL_MAX_DEGREE   45     // absolute max total lead angle
+
+#define FW_LEAD_MAX_Q8_8    ((int32_t)((FW_LEAD_MAX_DEGREE * 65536L) / 360))
+#define FW_LEAD_STEP_Q8_8   ((int32_t)(FW_LEAD_STEP_DEGREE * (65536.0f / 360.0f) + 0.5f))
+#define LEAD_TOTAL_MAX_Q8_8 ((uint16_t)((LEAD_TOTAL_MAX_DEGREE * 65536L) / 360))
 
 #define MAX_LEAD_CORR_Q8_8  ((uint16_t)((MAX_LEAD_CORR_DEGREE << 16)/360))  // apply on corection
 #define LEAD_STEP_MIN_Q8_8  ((uint16_t)(LEAD_STEP_MIN_DEGREE * (65536.0f / 360.0f) + 0.5f)) // apply on total   
@@ -323,6 +333,7 @@ uint16_t ui16_lead_base_current_q8_8 = 0;
 uint16_t ui16_lead_base_total_q8_8 = 0; 
 uint16_t ui16_lead_corr_q8_8 = 0;
 static int32_t  lead_corr_q8_8 = 0;
+static int32_t  fw_lead_offset_q8_8 = 0; // field weakening lead angle offset
 uint16_t ui16_lead_total_q8_8 = 0;
 
 // ---------------------------------------------------
@@ -470,6 +481,25 @@ void update_lead_angle(void)
     // Calcul total
     ui16_lead_total_q8_8 = (uint16_t)ui16_lead_base_total_q8_8 + (uint16_t)lead_corr_q8_8;
 
+    // Field weakening: target PWM at ~98% by adjusting lead angle beyond efficiency optimum
+    // Controlled by display FW toggle (ui8_field_weakening_enabled includes speed check)
+    if (ui8_field_weakening_enabled) {
+        uint8_t duty = (uint8_t)(ui16_g_duty_cycle >> 8);
+        if (duty >= FW_DUTY_TARGET && fw_lead_offset_q8_8 < FW_LEAD_MAX_Q8_8) {
+            fw_lead_offset_q8_8 += FW_LEAD_STEP_Q8_8;
+        } else if (duty < FW_DUTY_TARGET && fw_lead_offset_q8_8 > 0) {
+            fw_lead_offset_q8_8 -= FW_LEAD_STEP_Q8_8;
+            if (fw_lead_offset_q8_8 < 0) fw_lead_offset_q8_8 = 0;
+        }
+    } else {
+        fw_lead_offset_q8_8 = 0;
+    }
+
+    // Add FW offset to total, with absolute cap
+    ui16_lead_total_q8_8 += (uint16_t)fw_lead_offset_q8_8;
+    if (ui16_lead_total_q8_8 > LEAD_TOTAL_MAX_Q8_8)
+        ui16_lead_total_q8_8 = LEAD_TOTAL_MAX_Q8_8;
+
 }
 
 
@@ -602,20 +632,20 @@ void update_duty_cycle(void){
             || (ui16_adc_voltage < ui16_adc_voltage_cut_off)                                  // voltage is to low
             || (ui8_brake_state)
             ) {                                                           // brake is ON
-        //  first decrement field weakening angle if set or duty cycle if not
-        if (ui16_fw_hall_counter_offset > 0) {
-            if(ui16_fw_hall_counter_offset > ui16_controller_duty_cycle_ramp_down_step){
-                ui16_fw_hall_counter_offset -= ui16_controller_duty_cycle_ramp_down_step;
-            } else {
-                ui16_fw_hall_counter_offset = 0;
-            }        
-        }   else {
+        // Old FW hall counter ramp-down — no longer used, FW is handled in update_lead_angle()
+        // if (ui16_fw_hall_counter_offset > 0) {
+        //     if(ui16_fw_hall_counter_offset > ui16_controller_duty_cycle_ramp_down_step){
+        //         ui16_fw_hall_counter_offset -= ui16_controller_duty_cycle_ramp_down_step;
+        //     } else {
+        //         ui16_fw_hall_counter_offset = 0;
+        //     }
+        // } else {
             if (ui16_g_duty_cycle > ui16_controller_duty_cycle_ramp_down_step) {
                     ui16_g_duty_cycle  -= ui16_controller_duty_cycle_ramp_down_step;
             } else {
                 ui16_g_duty_cycle = 0;
             }
-        }
+        // }
     } else if(t_ramp_up_delay == 0) { // ramp up but only if not delayed due to a security check
         if ((ui8_controller_duty_cycle_target > (ui16_g_duty_cycle >> 8))                     // requested duty cycle is higher than actual
                 && (ui8_controller_adc_battery_current_target > ui8_adc_battery_current_filtered)) { //Requested current is higher than actual
@@ -629,15 +659,14 @@ void update_duty_cycle(void){
             }
             ui16_g_duty_cycle = temp_duty;
         }
-        else if ((ui8_field_weakening_enabled) && (ui16_g_duty_cycle == (ui8_pwm_duty_cycle_max << 8))) {
-            // increment field weakening angle
-            uint32_t temp_fw = ui16_fw_hall_counter_offset + ui16_controller_duty_cycle_ramp_up_step;        
-            // clamp
-            if (temp_fw > (ui8_fw_hall_counter_offset_max << 8)) {
-                temp_fw = (ui8_fw_hall_counter_offset_max << 8);
-            }
-            ui16_fw_hall_counter_offset = temp_fw;
-        }
+        // Old FW hall counter offset — replaced by lead angle FW in update_lead_angle()
+        // else if ((ui8_field_weakening_enabled) && (ui16_g_duty_cycle == (ui8_pwm_duty_cycle_max << 8))) {
+        //     uint32_t temp_fw = ui16_fw_hall_counter_offset + ui16_controller_duty_cycle_ramp_up_step;
+        //     if (temp_fw > (ui8_fw_hall_counter_offset_max << 8)) {
+        //         temp_fw = (ui8_fw_hall_counter_offset_max << 8);
+        //     }
+        //     ui16_fw_hall_counter_offset = temp_fw;
+        // }
     }    
 }
 
