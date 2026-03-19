@@ -271,16 +271,16 @@ void SysTick_Handler(void) {
 #define DEG_TO_Q8_8(x)      ((uint16_t)((x) * (65536.0f / 360.0f) + 0.5f))
 #define HALL_VELOCITY_RATIO          (4.474f)      // ratio between RPM and hall velocity_q8_8x1024
 
-#define LEAD_STEP_MIN_DEGREE  (0.02)       // ≈ 0.022° // lead angle correction is updated per small steps; varies between min and max
-#define LEAD_STEP_MAX_DEGREE  (0.35)       // ≈ 0.35°
-#define MAX_LEAD_CORR_DEGREE  (10)        // max for correction (in plus and min)
+#define LEAD_STEP_MIN_DEGREE  (0.01)       // finer steps near optimum (was 0.02)
+#define LEAD_STEP_MAX_DEGREE  (0.08)       // reduced slew rate: 16°/s vs 70°/s (was 0.35)
+#define MAX_LEAD_CORR_DEGREE  (7)          // correction range ±7° (was ±4°, originally ±10°)
 
 #define LOW_SPEED_RPM        (200)       // below this speed, lead angle is set on 0
 #define SPEED_FILTER_A_Q15   (30000)  // coeff IIR vitesse (α≈0.9)
 #define SPEED_FILTER_B_Q15   (32768 - SPEED_FILTER_A_Q15)
 
-#define IDABS_DEFAULT        (100)       // seuil absolu min en ADC units ;  Dead band adaptatif; this is the min ; it applies on Id
-#define K_REL_Q15            (1638)      // 0.05 * 32768 (5%)
+#define IDABS_DEFAULT        (40)        // reduced from 100 to allow correction to converge closer to true optimum (~2° offset vs ~5°)
+#define K_REL_Q15            (983)       // 0.03 * 32768 (3%) — reduced from 5% to allow tighter convergence under load
 #define HYST_FACTOR_Q15      (29491)     // 0.9 en Q15
 
 #define LEAD_ANGLE_Q8_8_PER_ADC_STEP (17) // = 750 / 45 = 17 : Test showed that for a speed of about 2500 RPM,
@@ -294,10 +294,12 @@ void SysTick_Handler(void) {
 // ---------------------------------------------------
 // Tables de base (utilisateur)
 // ---------------------------------------------------
-const uint16_t speed_tab[] = {0,     500,  1000, 2000, 3000, 4000};
+// Derived from: angle(RPM) = 0.464 × arctan(0.000297 × RPM)
+// See lead_angle_curve.md for curve fitting details
+const uint16_t speed_tab[] = {0,     500,  1000, 2000, 3000, 4000, 4700, 5500};
 #define SPEED_TAB_SIZE (sizeof(speed_tab) / sizeof(speed_tab[0]))
-
-const float lead_base_deg[] = {0.0f, 2.0f, 4.0f, 7.5f, 11.0f, 14.0f};
+                              // RPM:  0     500   1000  2000   3000   4000   4700   5500
+const float lead_base_deg[] = {0.0f, 4.0f, 8.0f, 14.0f, 19.0f, 23.0f, 25.0f, 27.0f};
 
 // ---------------------------------------------------
 // Tables internes générées au premier passage

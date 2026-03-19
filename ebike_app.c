@@ -2057,8 +2057,10 @@ static void check_system(void)
 	}
 	else {
 		ui8_check_cadence_sensor_counter = 0;
+		// auto-clear cadence error when condition goes away (no restart needed)
+		ui8_m_system_state &= ~ERROR_CADENCE_SENSOR;
 	}
-	
+
 	if (ui8_check_cadence_sensor_counter > CHECK_CADENCE_SENSOR_COUNTER_THRESHOLD) {
 		// set cadence sensor error code
 		ui8_m_system_state |= ERROR_CADENCE_SENSOR;
