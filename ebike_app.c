@@ -712,15 +712,15 @@ static void apply_power_assist(void)
 {
 	//mstrens :here current is based on adc_pedal_torque_delta * cadence * assist_factor * some ratio
 	uint8_t ui8_power_assist_multiplier_x50 = ui8_riding_mode_parameter;
-	
+
 	// check for assist without pedal rotation when there is no pedal rotation
 	if (ui8_assist_without_pedal_rotation_enabled) {
 		if ((!ui8_pedal_cadence_RPM) &&
 		   (ui16_adc_pedal_torque_delta > (120 - ui8_assist_without_pedal_rotation_threshold))) {
-				ui8_pedal_cadence_RPM = 1;
+				ui8_pedal_cadence_RPM = 5; // substitute cadence for power formula (1 gives near-zero at low PAS)
 		}
 	}
-	
+
   	// startup boost
 	if (ui8_startup_boost_enabled) {
 		apply_startup_boost();
@@ -1725,10 +1725,11 @@ static void get_pedal_torque(void) {
 		#if (USE_SPIDER_LOGIC_FOR_TORQUE == (1)) 
 		ui16_adc_pedal_torque_filtered_noExpo = filter( ui16_TorqueDeltaADC_norm , ui16_adc_pedal_torque_filtered_noExpo , 5); 
 		#else // (USE_SPIDER_LOGIC_FOR_TORQUE == (3) we use the average
-		if (ui8_TSamplesNum > 0) {
+		if (ui8_TSamplesNum > 0 && ui16_TorqueDeltaADC_norm > 0) {
 			ui16_adc_pedal_torque_filtered_noExpo = ui16_TSum / ui8_TSamplesNum; // partial rotation: avg of 1-19 samples
 		} else {
-			// Standstill: no PAS transitions yet, use filtered ADC directly
+			// No samples yet, or no current torque (foot off pedal) — use filtered ADC.
+			// Decays to 0 when rider stops; responds instantly at standstill.
 			ui16_adc_pedal_torque_filtered_noExpo = filter(ui16_TorqueDeltaADC_norm,
 				ui16_adc_pedal_torque_filtered_noExpo, 5);
 		}
